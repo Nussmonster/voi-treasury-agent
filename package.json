@@ -1,0 +1,27 @@
+{
+  "name": "voi-treasury-agent",
+  "version": "1.0.0",
+  "description": "Autonomous AI treasury agent on the Voi Network blockchain",
+  "scripts": {
+    "wallet": "bash scripts/1_create_wallet.sh",
+    "token": "node scripts/2_deploy_token.js",
+    "vault": "python3 scripts/3_deploy_vault.py",
+    "deploy": "bash scripts/4_deploy_frontend.sh",
+    "start": "npx serve frontend"
+  },
+  "dependencies": {
+    "algosdk": "^2.11.0"
+  },
+  "devDependencies": {
+    "serve": "^14.0.0"
+  },
+  "keywords": [
+    "voi",
+    "blockchain",
+    "defi",
+    "ai",
+    "treasury",
+    "avm"
+  ],
+  "license": "MIT"
+}
