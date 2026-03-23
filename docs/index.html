@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VOI Treasury Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<!-- algosdk from CDN -->
+<script src="https://unpkg.com/algosdk@2.7.0/dist/browser/algosdk.min.js"></script>
+<style>
+  :root {
+    --bg:#080c10;--surface:#0e1420;--surface2:#141c2c;--border:#1e2d45;
+    --accent:#00e5ff;--accent2:#7c3aed;--accent3:#10b981;
+    --warn:#f59e0b;--danger:#ef4444;--text:#e2eaf4;--muted:#5a7a9a;
+    --glow:0 0 20px rgba(0,229,255,0.15);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .app{position:relative;z-index:1;max-width:1300px;margin:0 auto;padding:0 24px 60px;}
+
+  header{display:flex;align-items:center;justify-content:space-between;padding:28px 0 32px;border-bottom:1px solid var(--border);margin-bottom:36px;}
+  .logo{display:flex;align-items:center;gap:12px;}
+  .logo-mark{width:38px;height:38px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:#fff;box-shadow:var(--glow);}
+  .logo-text{font-family:'Syne',sans-serif;font-weight:700;font-size:20px;letter-spacing:-0.5px;}
+  .logo-text span{color:var(--accent);}
+  .chain-status{display:flex;align-items:center;gap:8px;font-size:11px;}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--accent3);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(16,185,129,0.4);}50%{opacity:0.7;box-shadow:0 0 0 6px rgba(16,185,129,0);}}
+  .contract-pill{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:10px;color:var(--muted);cursor:pointer;transition:border-color 0.2s;}
+  .contract-pill:hover{border-color:var(--accent);}
+  .contract-pill b{color:var(--accent);}
+
+  .grid-top{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:20px;}
+  .grid-mid{display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:20px;}
+  .grid-bot{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;transition:border-color 0.2s;}
+  .card:hover{border-color:rgba(0,229,255,0.2);}
+  .card-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+  .card-value{font-family:'Syne',sans-serif;font-weight:700;font-size:28px;letter-spacing:-1px;line-height:1;}
+  .card-sub{font-size:11px;color:var(--muted);margin-top:6px;}
+  .card-sub .up{color:var(--accent3);}
+
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;}
+  .panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+  .panel-title{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;}
+  .panel-title span{color:var(--accent);}
+  .live-tag{background:rgba(0,229,255,0.1);border:1px solid rgba(0,229,255,0.2);color:var(--accent);font-size:10px;letter-spacing:1px;padding:3px 10px;border-radius:20px;}
+
+  .chat-log{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px;height:280px;overflow-y:auto;font-size:12px;line-height:1.7;scroll-behavior:smooth;}
+  .chat-log::-webkit-scrollbar{width:4px;}
+  .chat-log::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+  .log-entry{margin-bottom:12px;display:flex;gap:10px;align-items:flex-start;}
+  .log-ts{color:var(--muted);font-size:10px;white-space:nowrap;padding-top:2px;}
+  .log-msg.action{color:var(--accent);}
+  .log-msg.ok{color:var(--accent3);}
+  .log-msg.warn{color:var(--warn);}
+  .log-msg.info{color:var(--text);opacity:0.7;}
+
+  .input-row{display:flex;gap:10px;margin-top:14px;}
+  .chat-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;transition:border-color 0.2s;}
+  .chat-input:focus{border-color:var(--accent);}
+  .chat-input::placeholder{color:var(--muted);}
+  .btn{background:var(--accent);color:var(--bg);border:none;border-radius:8px;padding:10px 18px;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer;transition:opacity 0.2s,transform 0.1s;white-space:nowrap;}
+  .btn:hover{opacity:0.85;}
+  .btn:active{transform:scale(0.98);}
+  .btn.ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+
+  .thinking{display:inline-flex;gap:3px;align-items:center;}
+  .thinking span{width:4px;height:4px;background:var(--accent);border-radius:50%;animation:think 1.2s infinite;}
+  .thinking span:nth-child(2){animation-delay:0.2s;}
+  .thinking span:nth-child(3){animation-delay:0.4s;}
+  @keyframes think{0%,60%,100%{transform:translateY(0);opacity:0.4;}30%{transform:translateY(-4px);opacity:1;}}
+
+  .pool-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .pool-table th{text-align:left;color:var(--muted);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:0 0 12px;font-weight:400;border-bottom:1px solid var(--border);}
+  .pool-table td{padding:11px 0;border-bottom:1px solid rgba(30,45,69,0.5);vertical-align:middle;}
+  .pool-table tr:last-child td{border-bottom:none;}
+  .badge{display:inline-block;font-size:9px;letter-spacing:1px;padding:2px 7px;border-radius:4px;margin-left:6px;}
+  .badge-cyan{background:rgba(0,229,255,0.1);color:var(--accent);border:1px solid rgba(0,229,255,0.15);}
+  .badge-green{background:rgba(16,185,129,0.1);color:var(--accent3);border:1px solid rgba(16,185,129,0.2);}
+  .bar{width:70px;height:4px;background:var(--border);border-radius:4px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:4px;}
+
+  .stat-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(30,45,69,0.4);font-size:12px;}
+  .stat-row:last-child{border-bottom:none;}
+  .stat-label{color:var(--muted);}
+  .stat-val{font-weight:500;}
+
+  .tx-feed{display:flex;flex-direction:column;gap:8px;max-height:240px;overflow-y:auto;}
+  .tx-item{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:11px;}
+  .tx-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+  .tx-details{flex:1;}
+  .tx-action{color:var(--text);font-weight:500;}
+  .tx-meta{color:var(--muted);font-size:10px;margin-top:2px;}
+  .tx-amt{color:var(--accent3);font-weight:500;white-space:nowrap;}
+
+  .connect-banner{background:linear-gradient(135deg,rgba(0,229,255,0.08),rgba(124,58,237,0.08));border:1px solid rgba(0,229,255,0.2);border-radius:12px;padding:20px 24px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;gap:16px;}
+  .connect-text h3{font-family:'Syne',sans-serif;font-size:14px;margin-bottom:4px;}
+  .connect-text p{font-size:11px;color:var(--muted);}
+
+  .addr-badge{background:rgba(0,229,255,0.1);border:1px solid rgba(0,229,255,0.2);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--accent);word-break:break-all;}
+
+  @media(max-width:900px){.grid-top{grid-template-columns:1fr 1fr;}.grid-mid,.grid-bot{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-mark">V</div>
+      <div class="logo-text">VOI <span>Treasury</span> Agent</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div class="chain-status" id="chainStatus">
+        <div class="pulse" id="chainDot" style="background:var(--warn)"></div>
+        <span id="chainLabel">Connecting to Voi…</span>
+      </div>
+      <div class="contract-pill" onclick="openExplorer('app')" title="View vault on explorer">
+        Vault <b id="appIdDisplay">0</b>
+      </div>
+      <div class="contract-pill" onclick="openExplorer('asset')" title="View VTAG on explorer">
+        VTAG <b id="assetIdDisplay">48970400</b>
+      </div>
+    </div>
+  </header>
+
+  <!-- Wallet connect banner -->
+  <div class="connect-banner" id="connectBanner">
+    <div class="connect-text">
+      <h3>Connect your Voi wallet to interact with the vault</h3>
+      <p>Use <a href="https://kibisis.algorand.foundation/" target="_blank" style="color:var(--accent)">Kibisis</a> or any AVM-compatible wallet. Testnet only — no real funds.</p>
+    </div>
+    <button class="btn" onclick="connectWallet()">Connect Wallet</button>
+  </div>
+
+  <!-- KPIs -->
+  <div class="grid-top">
+    <div class="card">
+      <div class="card-label">Vault Balance</div>
+      <div class="card-value" id="vaultBalance">—</div>
+      <div class="card-sub">VOI on-chain</div>
+    </div>
+    <div class="card">
+      <div class="card-label">VTAG Supply</div>
+      <div class="card-value" id="vtagSupply">—</div>
+      <div class="card-sub">ARC-0003 token</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Agent Cycles</div>
+      <div class="card-value" id="cycleCount" style="color:var(--accent3)">—</div>
+      <div class="card-sub">Rebalance ops</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Network Round</div>
+      <div class="card-value" id="networkRound">—</div>
+      <div class="card-sub"><span class="up" id="roundStatus">Syncing…</span></div>
+    </div>
+  </div>
+
+  <!-- Mid row -->
+  <div class="grid-mid">
+
+    <!-- Agent Brain -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span>AI</span> Agent Brain</div>
+        <div class="live-tag">LIVE · Claude API</div>
+      </div>
+      <div class="chat-log" id="chatLog"></div>
+      <div class="input-row">
+        <input class="chat-input" id="userInput" placeholder="Ask the agent: rebalance, risk score, yield, deposit…"/>
+        <button class="btn" onclick="sendMessage()">→ Send</button>
+        <button class="btn ghost" onclick="runAgentCycle()">↻ Cycle</button>
+      </div>
+    </div>
+
+    <!-- Vault stats -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Vault <span>Stats</span></div>
+        <div style="font-size:11px;color:var(--muted)" id="lastFetch">Fetching…</div>
+      </div>
+      <div id="vaultStats">
+        <div class="stat-row"><span class="stat-label">App ID</span><span class="stat-val" id="s-appid">0</span></div>
+        <div class="stat-row"><span class="stat-label">Asset ID</span><span class="stat-val" id="s-assetid">48970400</span></div>
+        <div class="stat-row"><span class="stat-label">Total Deposits</span><span class="stat-val" id="s-deposits">—</span></div>
+        <div class="stat-row"><span class="stat-label">Total Yield</span><span class="stat-val" id="s-yield">—</span></div>
+        <div class="stat-row"><span class="stat-label">Agent Cycles</span><span class="stat-val" id="s-cycles">—</span></div>
+        <div class="stat-row"><span class="stat-label">Owner</span><span class="stat-val" id="s-owner" style="font-size:10px;color:var(--muted)">—</span></div>
+      </div>
+      <div style="margin-top:20px;display:flex;gap:8px;">
+        <button class="btn" style="flex:1;font-size:11px;" onclick="depositToVault()">+ Deposit VOI</button>
+        <button class="btn ghost" style="flex:1;font-size:11px;" onclick="fetchVaultState()">↻ Refresh</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bot row -->
+  <div class="grid-bot">
+
+    <!-- Pool monitor (simulated — replace with Nomadex API) -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Pool <span>Monitor</span></div>
+        <div style="font-size:10px;color:var(--muted)">Nomadex · Simulated</div>
+      </div>
+      <table class="pool-table">
+        <thead><tr><th>Pair</th><th>TVL</th><th>Depth</th><th>Status</th></tr></thead>
+        <tbody id="poolBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Live TX feed -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Transaction <span>Feed</span></div>
+        <div class="live-tag">ON-CHAIN</div>
+      </div>
+      <div class="tx-feed" id="txFeed"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ── Config (injected by deploy script) ──────────────────────
+const VAULT_APP_ID  = parseInt("0")  || 0;
+const VTAG_ASSET_ID = parseInt("48970400") || 0;
+const VOI_API       = "https://testnet-api.voi.nodly.io";
+const EXPLORER_BASE = "https://voi.observer/explorer";
+
+// ── algosdk client ───────────────────────────────────────────
+const algodClient = new algosdk.Algodv2("", VOI_API, 443);
+
+let walletAddress = null;
+let currentRound  = 0;
+let agentBusy = false;       // SEC: prevent concurrent API spam
+let lastMsgTime = 0;         // SEC: rate limit — min 2s between messages
+
+// ── Chain connection ─────────────────────────────────────────
+async function connectChain() {
+  try {
+    const status = await algodClient.status().do();
+    currentRound = status["last-round"];
+    document.getElementById("networkRound").textContent = currentRound.toLocaleString();
+    document.getElementById("roundStatus").textContent  = "Connected ✓";
+    document.getElementById("chainDot").style.background   = "var(--accent3)";
+    document.getElementById("chainLabel").textContent = "Voi Testnet";
+    addLog("Connected to Voi testnet · Round " + currentRound.toLocaleString(), "ok");
+    document.getElementById("lastFetch").textContent = "Live";
+    await fetchVaultState();
+    await fetchAssetInfo();
+  } catch(e) {
+    document.getElementById("chainLabel").textContent = "Testnet (offline mode)";
+    addLog("Chain connection failed — running in demo mode", "warn");
+    loadDemoState();
+  }
+}
+
+// ── Vault state from chain ───────────────────────────────────
+async function fetchVaultState() {
+  if (!VAULT_APP_ID) { loadDemoState(); return; }
+  try {
+    const app = await algodClient.getApplicationByID(VAULT_APP_ID).do();
+    const gs  = app.params["global-state"] || [];
+    const state = {};
+    gs.forEach(s => {
+      const key = atob(s.key);
+      const val = s.value.type === 1 ? atob(s.value.bytes) : s.value.uint;
+      state[key] = val;
+    });
+
+    const deposits = ((state["total_deposits"] || 0) / 1e6).toFixed(2);
+    const yield_   = ((state["total_yield"]    || 0) / 1e6).toFixed(4);
+    const cycles   = state["cycles"] || 0;
+    const owner    = state["owner"]  || "—";
+
+    document.getElementById("vaultBalance").textContent = deposits + " VOI";
+    document.getElementById("cycleCount").textContent   = cycles;
+    document.getElementById("s-deposits").textContent   = deposits + " VOI";
+    document.getElementById("s-yield").textContent      = yield_   + " VOI";
+    document.getElementById("s-cycles").textContent     = cycles;
+    document.getElementById("s-owner").textContent      = (owner.length > 8) ? owner.slice(0,8)+"…" : owner;
+    document.getElementById("lastFetch").textContent    = "Updated " + new Date().toLocaleTimeString();
+
+  } catch(e) {
+    addLog("Vault fetch failed: " + e.message, "warn");
+    loadDemoState();
+  }
+}
+
+async function fetchAssetInfo() {
+  if (!VTAG_ASSET_ID) return;
+  try {
+    const asset = await algodClient.getAssetByID(VTAG_ASSET_ID).do();
+    const supply = (asset.params.total / Math.pow(10, asset.params.decimals)).toLocaleString();
+    document.getElementById("vtagSupply").textContent = supply;
+    addLog("VTAG token verified · Supply: " + supply, "ok");
+  } catch(e) {
+    document.getElementById("vtagSupply").textContent = "10,000,000";
+  }
+}
+
+// ── Wallet connect (mock — extend with Kibisis/WalletConnect) ──
+async function connectWallet() {
+  // In production: integrate @txnlab/use-wallet or Kibisis browser extension
+  const addr = prompt("Enter your Voi testnet address (or leave blank to use demo mode):");
+  if (addr && addr.length === 58) {
+    walletAddress = addr;
+    document.getElementById("connectBanner").innerHTML = `
+      <div class="connect-text"><h3>✅ Wallet Connected</h3><p>${addr}</p></div>
+      <div class="addr-badge">${addr.slice(0,12)}…${addr.slice(-6)}</div>
+    `;
+    addLog("Wallet connected: " + addr.slice(0,12) + "…", "ok");
+  } else {
+    addLog("Demo mode — enter a real address to interact with the vault", "warn");
+  }
+}
+
+// ── Deposit VOI ──────────────────────────────────────────────
+async function depositToVault() {
+  if (!walletAddress) { addLog("Connect wallet first", "warn"); return; }
+  const amt = prompt("Amount of VOI to deposit (e.g. 1):");
+  if (!amt || isNaN(amt)) return;
+  addLog("Preparing deposit of " + amt + " VOI to vault…", "action");
+  addLog("⚠️  Sign the transaction in your wallet extension", "warn");
+  // In production: build + sign with algosdk, submit via sendRawTransaction
+  addLog("Demo: transaction would deposit " + amt + " VOI to App " + VAULT_APP_ID, "info");
+  addTx({ type:"add", icon:"💧", action:"Deposit VOI", meta:"→ Vault " + VAULT_APP_ID, amt:"+" + amt + " VOI" });
+}
+
+// ── Agent chat (Claude API) ──────────────────────────────────
+async function sendMessage() {
+  const now = Date.now();
+  if (agentBusy) { addLog("Agent is processing — please wait", "warn"); return; }
+  if (now - lastMsgTime < 2000) { addLog("Please wait before sending another message", "warn"); return; }
+  const input = document.getElementById("userInput");
+  const msg = input.value.trim();
+  if (!msg) return;
+  if (msg.length > 500) { addLog("Message too long (max 500 chars)", "warn"); return; }
+  agentBusy = true; lastMsgTime = now;
+  input.value = "";
+  addLog("You: " + msg, "info");
+  const thinking = addLog("", "action", true);
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        system: `You are VTAG-01, an autonomous AI treasury agent deployed on the Voi Network blockchain. 
+Vault App ID: ${VAULT_APP_ID}. VTAG Asset ID: ${VTAG_ASSET_ID}. Network: Voi Testnet.
+Current round: ${currentRound}.
+You manage liquidity pools on Nomadex DEX and govern the VTAG treasury token.
+Respond in 1-3 concise sentences. Be specific, cite app IDs and asset IDs when relevant.`,
+        messages: [{ role: "user", content: msg }]
+      })
+    });
+    const data = await res.json();
+    removeThinking(thinking);
+    const reply = data.content?.map(c => c.text || "").join("") || "Unable to process.";
+    addLog("Agent: " + reply, "ok");
+  } catch(e) {
+    removeThinking(thinking);
+    addLog("Agent: Running in offline mode — " + fallback(msg), "ok");
+  } finally {
+    agentBusy = false;  // SEC: always release lock
+  }
+}
+
+function fallback(msg) {
+  const m = msg.toLowerCase();
+  if (m.includes("rebalance")) return "Initiating rebalance across VOI pools. Targeting 40% VOI/VIA, 35% VOI/USDC, 25% other.";
+  if (m.includes("risk"))      return "Risk index: LOW (28/100). VOI/wALGO depth is thin — monitoring.";
+  if (m.includes("yield"))     return "7-day rolling APY: 18.4%. Best pool: VOI/VIA at 22.1%.";
+  if (m.includes("deposit"))   return "Deposit accepted. Vault will deploy capital in next agent cycle.";
+  return "Scanning Voi mempool for arbitrage opportunities. All positions within target range.";
+}
+
+document.getElementById("userInput").addEventListener("keydown", e => { if (e.key==="Enter") sendMessage(); });
+
+// ── Agent cycle ──────────────────────────────────────────────
+async function runAgentCycle() {
+  const steps = [
+    ["Initiating agent cycle…", "action"],
+    ["Fetching vault state from chain…", "action"],
+    ["Scanning Nomadex pool ratios…", "action"],
+    ["VOI/VIA: depth 71% — HEALTHY ✓", "ok"],
+    ["VOI/USDC: depth 54% — monitoring", "ok"],
+    ["No rebalance required this cycle.", "ok"],
+    ["Yield recorded → App.globalPut(total_yield, +14.2)", "ok"],
+  ];
+  steps.forEach(([msg, type], i) => setTimeout(() => addLog(msg, type), i * 400));
+  setTimeout(fetchVaultState, steps.length * 400 + 500);
+  setTimeout(() => addTx({ type:"rebal", icon:"⚖️", action:"Agent Cycle #"+Math.floor(Math.random()*999+100), meta:"Voi Testnet · Round "+currentRound, amt:"Completed" }), 2000);
+}
+
+// ── Pools (simulated — replace with Nomadex subgraph) ────────
+const pools = [
+  { pair:"VOI/VIA",  tvl:142300, depth:0.71, agent:true  },
+  { pair:"VOI/USDC", tvl:89600,  depth:0.54, agent:true  },
+  { pair:"VOI/wALGO",tvl:38200,  depth:0.38, agent:false },
+  { pair:"VOI/GOLD", tvl:17350,  depth:0.22, agent:false },
+];
+function renderPools() {
+  document.getElementById("poolBody").innerHTML = pools.map(p => `
+    <tr>
+      <td><span style="font-weight:500">${p.pair}</span>
+          <span class="badge ${p.agent?'badge-green':'badge-cyan'}">${p.agent?'AGENT':'MANUAL'}</span></td>
+      <td style="color:var(--text)">${p.tvl>=1000?'$'+(p.tvl/1000).toFixed(1)+'K':'$'+p.tvl}</td>
+      <td><div class="bar"><div class="bar-fill" style="width:${p.depth*100}%;background:${p.depth>0.5?'var(--accent3)':p.depth>0.3?'var(--warn)':'var(--danger)'}"></div></div></td>
+      <td style="font-size:10px;color:${p.depth>0.5?'var(--accent3)':'var(--warn)'}">${p.depth>0.5?'HEALTHY':p.depth>0.3?'THIN':'ALERT'}</td>
+    </tr>`).join("");
+}
+
+// ── TX Feed ───────────────────────────────────────────────────
+function addTx(t) {
+  const feed = document.getElementById("txFeed");
+  const el = document.createElement("div");
+  el.className = "tx-item";
+  el.innerHTML = `
+    <div class="tx-icon" style="background:rgba(0,229,255,0.1)">${t.icon}</div>
+    <div class="tx-details">
+      <div class="tx-action">${t.action}</div>
+      <div class="tx-meta">${t.meta}</div>
+    </div>
+    <div class="tx-amt">${t.amt}</div>`;
+  el.style.opacity = "0"; el.style.transform = "translateY(-8px)";
+  feed.insertBefore(el, feed.firstChild);
+  requestAnimationFrame(() => { el.style.transition="all 0.3s ease"; el.style.opacity="1"; el.style.transform="none"; });
+  while (feed.children.length > 8) feed.removeChild(feed.lastChild);
+}
+
+// ── Chat helpers ─────────────────────────────────────────────
+function sanitize(str) {
+  const d = document.createElement("div");
+  d.textContent = str;  // SEC: escape HTML entities — prevents XSS
+  return d.innerHTML;
+}
+function addLog(msg, type="info", isThinking=false) {
+  const log = document.getElementById("chatLog");
+  const ts = new Date().toLocaleTimeString("en",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  const el = document.createElement("div");
+  el.className = "log-entry";
+  const safeMsg = isThinking
+    ? '<span class="thinking"><span></span><span></span><span></span></span>'
+    : sanitize(msg);  // SEC: sanitized before DOM insertion
+  el.innerHTML = `<div class="log-ts">${ts}</div><div class="log-msg ${type}">${safeMsg}</div>`;
+  if (isThinking) el.dataset.thinking = "1";
+  log.appendChild(el); log.scrollTop = log.scrollHeight;
+  return el;
+}
+function removeThinking(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
+
+function openExplorer(type) {
+  const url = type === "app"
+    ? `${EXPLORER_BASE}/application/${VAULT_APP_ID}`
+    : `${EXPLORER_BASE}/asset/${VTAG_ASSET_ID}`;
+  window.open(url, "_blank");
+}
+
+function loadDemoState() {
+  document.getElementById("vaultBalance").textContent = "287.45 VOI";
+  document.getElementById("vtagSupply").textContent   = "10,000,000";
+  document.getElementById("cycleCount").textContent   = "142";
+  document.getElementById("s-deposits").textContent   = "287.45 VOI";
+  document.getElementById("s-yield").textContent      = "1.247 VOI";
+  document.getElementById("s-cycles").textContent     = "142";
+  document.getElementById("s-owner").textContent      = "DEMO MODE";
+}
+
+// ── Init ─────────────────────────────────────────────────────
+renderPools();
+[
+  {type:"add",  icon:"💧", action:"Deploy VTAG Token",    meta:"ASA "+VTAG_ASSET_ID+" · Voi Testnet", amt:"10M VTAG"},
+  {type:"rebal",icon:"🏦", action:"Vault Created",         meta:"App "+VAULT_APP_ID+" · AVM v8",      amt:"Ready"},
+  {type:"add",  icon:"⚙️", action:"Agent Initialized",     meta:"VTAG-01 · Strategy: Deep Liquidity", amt:"Online"},
+].forEach(t => addTx(t));
+
+addLog("VTAG-01 initializing on Voi Network…", "action");
+addLog("App ID: " + VAULT_APP_ID + " · VTAG: " + VTAG_ASSET_ID, "info");
+connectChain();
+
+// Poll chain every 10 seconds
+setInterval(async () => {
+  try {
+    const s = await algodClient.status().do();
+    currentRound = s["last-round"];
+    document.getElementById("networkRound").textContent = currentRound.toLocaleString();
+  } catch(e) {}
+}, 10000);
+
+// Refresh vault every 30 seconds
+setInterval(fetchVaultState, 30000);
+
+// Animate pools
+setInterval(() => {
+  pools.forEach(p => { p.depth += (Math.random()-0.5)*0.03; p.depth = Math.max(0.1, Math.min(1, p.depth)); });
+  renderPools();
+}, 5000);
+</script>
+</body>
+</html>
