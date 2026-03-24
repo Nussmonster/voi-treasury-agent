@@ -25,7 +25,7 @@ try:
     from pyteal import *
 except ImportError:
     import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "algosdk", "pyteal"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "py-algorand-sdk", "pyteal"])
     from algosdk import account, mnemonic, transaction, encoding
     from algosdk.v2client import algod
     from pyteal import *
