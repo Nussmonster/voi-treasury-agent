@@ -132,7 +132,7 @@
   <div class="connect-banner" id="connectBanner">
     <div class="connect-text">
       <h3>Connect your Voi wallet to interact with the vault</h3>
-      <p>Use <a href="https://kibisis.algorand.foundation/" target="_blank" style="color:var(--accent)">Kibisis</a> or any AVM-compatible wallet. Testnet only — no real funds.</p>
+      <p>Use <a href="https://kibisis.algorand.foundation/" target="_blank" style="color:var(--accent)">Kibisis</a> or any AVM-compatible wallet. Voi Mainnet.</p>
     </div>
     <button class="btn" onclick="connectWallet()">Connect Wallet</button>
   </div>
@@ -232,7 +232,7 @@
 // ── Config (injected by deploy script) ──────────────────────
 const VAULT_APP_ID  = parseInt("0")  || 0;
 const VTAG_ASSET_ID = parseInt("48970400") || 0;
-const VOI_API       = "https://testnet-api.voi.nodly.io";
+const VOI_API       = "https://mainnet-api.voi.nodely.io";
 const EXPLORER_BASE = "https://voi.observer/explorer";
 
 // ── algosdk client ───────────────────────────────────────────
@@ -251,12 +251,12 @@ async function connectChain() {
     document.getElementById("networkRound").textContent = currentRound.toLocaleString();
     document.getElementById("roundStatus").textContent  = "Connected ✓";
     document.getElementById("chainDot").style.background   = "var(--accent3)";
-    document.getElementById("chainLabel").textContent = "Voi Testnet";
-    addLog("Connected to Voi testnet · Round " + currentRound.toLocaleString(), "ok");
+    document.getElementById("chainLabel").textContent = "Voi Mainnet";
+    addLog("Connected to Voi mainnet · Round " + currentRound.toLocaleString(), "ok");
     document.getElementById("lastFetch").textContent = "Live";
     await Promise.all([fetchVaultState(), fetchAssetInfo()]);
   } catch(e) {
-    document.getElementById("chainLabel").textContent = "Testnet (offline mode)";
+    document.getElementById("chainLabel").textContent = "Mainnet (offline mode)";
     addLog("Chain connection failed — running in demo mode", "warn");
     loadDemoState();
   }
@@ -309,7 +309,7 @@ async function fetchAssetInfo() {
 // ── Wallet connect (mock — extend with Kibisis/WalletConnect) ──
 async function connectWallet() {
   // In production: integrate @txnlab/use-wallet or Kibisis browser extension
-  const addr = prompt("Enter your Voi testnet address (or leave blank to use demo mode):");
+  const addr = prompt("Enter your Voi mainnet address (or leave blank to use demo mode):");
   if (addr && addr.length === 58) {
     walletAddress = addr;
     document.getElementById("connectBanner").innerHTML = `
@@ -335,10 +335,10 @@ async function depositToVault() {
 }
 
 // ── Agent chat ───────────────────────────────────────────────
-// NOTE: Direct browser-to-Anthropic API calls require a backend proxy
-// to avoid exposing the API key. Using offline fallback responses for now.
-// To enable live AI: deploy a proxy (e.g. Cloudflare Worker) and set AGENT_PROXY_URL.
-const AGENT_PROXY_URL = "";  // set to your proxy endpoint to enable live Claude responses
+// Claude API proxy — required to keep the API key off the browser.
+// Deploy: cd worker && wrangler deploy && wrangler secret put ANTHROPIC_API_KEY
+// Then paste the *.workers.dev URL below.
+const AGENT_PROXY_URL = "https://vtag-agent-proxy.YOUR-SUBDOMAIN.workers.dev";
 
 async function sendMessage() {
   const now = Date.now();
@@ -362,7 +362,7 @@ async function sendMessage() {
           model: "claude-sonnet-4-20250514",
           max_tokens: 1000,
           system: `You are VTAG-01, an autonomous AI treasury agent deployed on the Voi Network blockchain.
-Vault App ID: ${VAULT_APP_ID}. VTAG Asset ID: ${VTAG_ASSET_ID}. Network: Voi Testnet.
+Vault App ID: ${VAULT_APP_ID}. VTAG Asset ID: ${VTAG_ASSET_ID}. Network: Voi Mainnet.
 Current round: ${currentRound}.
 You manage liquidity pools on Nomadex DEX and govern the VTAG treasury token.
 Respond in 1-3 concise sentences. Be specific, cite app IDs and asset IDs when relevant.`,
@@ -410,7 +410,7 @@ async function runAgentCycle() {
   ];
   steps.forEach(([msg, type], i) => setTimeout(() => addLog(msg, type), i * 400));
   setTimeout(fetchVaultState, steps.length * 400 + 500);
-  setTimeout(() => addTx({ type:"rebal", icon:"⚖️", action:"Agent Cycle #"+Math.floor(Math.random()*999+100), meta:"Voi Testnet · Round "+currentRound, amt:"Completed" }), 2000);
+  setTimeout(() => addTx({ type:"rebal", icon:"⚖️", action:"Agent Cycle #"+Math.floor(Math.random()*999+100), meta:"Voi Mainnet · Round "+currentRound, amt:"Completed" }), 2000);
 }
 
 // ── Pools (simulated — replace with Nomadex subgraph) ────────
@@ -490,7 +490,7 @@ function loadDemoState() {
 // ── Init ─────────────────────────────────────────────────────
 renderPools();
 [
-  {type:"add",  icon:"💧", action:"Deploy VTAG Token",    meta:"ASA "+VTAG_ASSET_ID+" · Voi Testnet", amt:"10M VTAG"},
+  {type:"add",  icon:"💧", action:"Deploy VTAG Token",    meta:"ASA "+VTAG_ASSET_ID+" · Voi Mainnet", amt:"10M VTAG"},
   {type:"rebal",icon:"🏦", action:"Vault Created",         meta:"App "+VAULT_APP_ID+" · AVM v8",      amt:"Ready"},
   {type:"add",  icon:"⚙️", action:"Agent Initialized",     meta:"VTAG-01 · Strategy: Deep Liquidity", amt:"Online"},
 ].forEach(t => addTx(t));

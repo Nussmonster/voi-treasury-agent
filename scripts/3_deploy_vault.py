@@ -31,7 +31,7 @@ except ImportError:
     from pyteal import *
 
 # ── Voi Testnet config ───────────────────────────────────────
-VOI_API   = "https://testnet-api.voi.nodly.io"
+VOI_API   = "https://mainnet-api.voi.nodely.io"
 VOI_TOKEN = ""
 VOI_PORT  = 443
 
