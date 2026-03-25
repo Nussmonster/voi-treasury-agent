@@ -254,8 +254,7 @@ async function connectChain() {
     document.getElementById("chainLabel").textContent = "Voi Testnet";
     addLog("Connected to Voi testnet · Round " + currentRound.toLocaleString(), "ok");
     document.getElementById("lastFetch").textContent = "Live";
-    await fetchVaultState();
-    await fetchAssetInfo();
+    await Promise.all([fetchVaultState(), fetchAssetInfo()]);
   } catch(e) {
     document.getElementById("chainLabel").textContent = "Testnet (offline mode)";
     addLog("Chain connection failed — running in demo mode", "warn");
@@ -335,7 +334,12 @@ async function depositToVault() {
   addTx({ type:"add", icon:"💧", action:"Deposit VOI", meta:"→ Vault " + VAULT_APP_ID, amt:"+" + amt + " VOI" });
 }
 
-// ── Agent chat (Claude API) ──────────────────────────────────
+// ── Agent chat ───────────────────────────────────────────────
+// NOTE: Direct browser-to-Anthropic API calls require a backend proxy
+// to avoid exposing the API key. Using offline fallback responses for now.
+// To enable live AI: deploy a proxy (e.g. Cloudflare Worker) and set AGENT_PROXY_URL.
+const AGENT_PROXY_URL = "";  // set to your proxy endpoint to enable live Claude responses
+
 async function sendMessage() {
   const now = Date.now();
   if (agentBusy) { addLog("Agent is processing — please wait", "warn"); return; }
@@ -347,32 +351,38 @@ async function sendMessage() {
   agentBusy = true; lastMsgTime = now;
   input.value = "";
   addLog("You: " + msg, "info");
-  const thinking = addLog("", "action", true);
 
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        system: `You are VTAG-01, an autonomous AI treasury agent deployed on the Voi Network blockchain. 
+  if (AGENT_PROXY_URL) {
+    const thinking = addLog("", "action", true);
+    try {
+      const res = await fetch(AGENT_PROXY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          system: `You are VTAG-01, an autonomous AI treasury agent deployed on the Voi Network blockchain.
 Vault App ID: ${VAULT_APP_ID}. VTAG Asset ID: ${VTAG_ASSET_ID}. Network: Voi Testnet.
 Current round: ${currentRound}.
 You manage liquidity pools on Nomadex DEX and govern the VTAG treasury token.
 Respond in 1-3 concise sentences. Be specific, cite app IDs and asset IDs when relevant.`,
-        messages: [{ role: "user", content: msg }]
-      })
-    });
-    const data = await res.json();
-    removeThinking(thinking);
-    const reply = data.content?.map(c => c.text || "").join("") || "Unable to process.";
-    addLog("Agent: " + reply, "ok");
-  } catch(e) {
-    removeThinking(thinking);
-    addLog("Agent: Running in offline mode — " + fallback(msg), "ok");
-  } finally {
-    agentBusy = false;  // SEC: always release lock
+          messages: [{ role: "user", content: msg }]
+        })
+      });
+      const data = await res.json();
+      removeThinking(thinking);
+      const reply = data.content?.map(c => c.text || "").join("") || "Unable to process.";
+      addLog("Agent: " + reply, "ok");
+    } catch(e) {
+      removeThinking(thinking);
+      addLog("Agent: " + fallback(msg), "ok");
+    } finally {
+      agentBusy = false;
+    }
+  } else {
+    // Offline mode — instant response, no network hang
+    addLog("Agent: " + fallback(msg), "ok");
+    agentBusy = false;
   }
 }
 

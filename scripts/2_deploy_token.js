@@ -7,7 +7,7 @@
 const algosdk = require('algosdk');
 
 // Voi Testnet public API (no key needed)
-const VOI_TESTNET_API  = 'https://mainnet-api.voi.nodely.io';
+const VOI_TESTNET_API  = 'https://testnet-api.voi.nodely.io';
 const VOI_TESTNET_PORT = 443;
 const VOI_API_TOKEN    = '';  // public node — no token required
 
