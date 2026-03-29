@@ -1,0 +1,1 @@
+py -3.11 scripts/3_deploy_vault.py --mnemonic "$(cat mnemonic.txt)" --asset-id 48970400 --signer1 "$SIGNER_1" --signer2 "$SIGNER_2" --signer3 "$SIGNER_3" --threshold 2
